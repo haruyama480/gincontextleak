@@ -1,3 +1,8 @@
+// Package gincontextleak provides a go/analysis analyzer that detects
+// unsafe passing of *gin.Context to functions expecting context.Context.
+//
+// gin.Context is not goroutine-safe. Passing it where context.Context is
+// expected can cause data races.
 package gincontextleak
 
 import (
@@ -11,6 +16,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
+// Analyzer reports calls that pass *gin.Context to a context.Context parameter.
 var Analyzer = &analysis.Analyzer{
 	Name: "gincontextleak",
 	Doc: `reports calls that pass *gin.Context to a context.Context parameter.

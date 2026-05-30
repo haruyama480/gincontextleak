@@ -1,3 +1,4 @@
+// Command gincontextleak is the command-line entry point for the gincontextleak analyzer.
 package main
 
 import (
