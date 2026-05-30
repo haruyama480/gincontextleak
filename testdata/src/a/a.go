@@ -76,3 +76,12 @@ func exerciseFastPath(c *gin.Context, ctx context.Context, r runner, o otherRunn
 	takesIntAndContext(1, ctx)
 	takesContextThenVariadic(ctx, "z")
 }
+
+// getGinContext returns a *gin.Context. Passing its result exercises the
+// fallback path in makeRequestContextEdit (non-Identifier expression).
+func getGinContext() *gin.Context { return nil }
+
+func exerciseFallback(c *gin.Context) {
+	// This call expression as argument goes through the format.Node fallback.
+	takesContext(getGinContext()) // want `do not pass \*gin.Context where context.Context is expected`
+}

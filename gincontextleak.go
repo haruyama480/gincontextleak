@@ -141,7 +141,20 @@ func paramTypeForArg(sig *types.Signature, idx int) types.Type {
 }
 
 func makeRequestContextEdit(pass *analysis.Pass, arg ast.Expr) analysis.TextEdit {
-	// Build the replacement expression: <arg>.Request.Context()
+	// Fast path for the common case: the argument is a simple identifier
+	// such as `c` or `ctx`. This is by far the most frequent pattern in
+	// real Gin handlers and completely avoids AST construction + format.Node.
+	if ident, ok := arg.(*ast.Ident); ok {
+		return analysis.TextEdit{
+			Pos:     arg.Pos(),
+			End:     arg.End(),
+			NewText: []byte(ident.Name + ".Request.Context()"),
+		}
+	}
+
+	// Fallback for complex expressions (selector exprs, calls, parenthesized
+	// expressions, index expressions, etc.). We still need to produce valid
+	// Go source, so we build a small AST and let go/format handle it.
 	reqSel := &ast.SelectorExpr{
 		X:   arg,
 		Sel: ast.NewIdent("Request"),
