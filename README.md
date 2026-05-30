@@ -40,6 +40,15 @@ Automatically fix issues:
 gincontextleak -fix ./...
 ```
 
+## Version information
+
+Go tool convention (`-V` flag only):
+
+```bash
+gincontextleak -V=full
+go version -m $(which gincontextleak)
+```
+
 ## Limitations
 
 The linter only detects cases where `*gin.Context` is passed directly as an argument to a function or method parameter of type `context.Context`.
