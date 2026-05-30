@@ -62,11 +62,3 @@ Although `*gin.Context` implements the `context.Context` interface, the followin
 - Indirect passing via `interface{}` or other intermediate types
 
 Detecting all of these cases would require dataflow analysis, which is not currently implemented.
-
-## Links
-
-- [Go Reference / godoc](https://pkg.go.dev/github.com/haruyama480/gincontextleak)
-- [Releases & Artifacts](https://github.com/haruyama480/gincontextleak/releases) — Prebuilt binaries (Linux/macOS/Windows) via GoReleaser
-- [CI/CD](https://github.com/haruyama480/gincontextleak/actions)
-- [Homebrew Tap](https://github.com/haruyama480/homebrew-tap)
-- [Source Code](https://github.com/haruyama480/gincontextleak)
