@@ -16,9 +16,26 @@ func takesAny(v any) {}
 
 func takesVariadic(prefix string, ctxs ...context.Context) {}
 
+// Functions that do NOT take context.Context at all (exercise the fast-path skip)
+func takesNothing()                    {}
+func takesString(s string)             {}
+func takesIntAndString(i int, s string) {}
+func takesVariadicInts(prefix string, nums ...int) {}
+
+// Function that takes context only as a non-first parameter
+func takesIntAndContext(i int, ctx context.Context) {}
+
+// Function with context param followed by variadic non-context
+func takesContextThenVariadic(ctx context.Context, vals ...string) {}
+
 type runner struct{}
 
 func (runner) Run(ctx context.Context) {}
+
+// Method on a different type
+type otherRunner struct{}
+
+func (otherRunner) Execute(name string) {}
 
 func exercise(c *gin.Context, ctx context.Context, r runner) {
 	takesContext(c)                         // want `do not pass \*gin.Context where context.Context is expected`
@@ -29,4 +46,33 @@ func exercise(c *gin.Context, ctx context.Context, r runner) {
 
 	takesContext(ctx)
 	takesAny(c)
+}
+
+func exerciseFastPath(c *gin.Context, ctx context.Context, r runner, o otherRunner) {
+	// Many calls to functions with no context params at all.
+	// These should be skipped very early by signatureHasAnyContextParam.
+	takesNothing()
+	takesString("hello")
+	takesIntAndString(1, "x")
+	takesVariadicInts("p", 1, 2, 3)
+	o.Execute("foo")
+
+	// Passing *gin.Context to a non-context param must NOT report
+	// (and must not be affected by the optimization).
+	takesNothing()
+	takesString("x")
+	takesIntAndString(42, "y")
+	takesVariadicInts("p", 10)
+
+	// Now real detections, some with context in later positions
+	takesIntAndContext(7, c)                        // want `do not pass \*gin.Context where context.Context is expected`
+	takesContextThenVariadic(c, "a", "b")           // want `do not pass \*gin.Context where context.Context is expected`
+
+	// Variadic context in different positions
+	takesVariadic("x", c)                           // want `do not pass \*gin.Context where context.Context is expected`
+	takesVariadic("x", ctx, c)                     // want `do not pass \*gin.Context where context.Context is expected`
+
+	// Mix of safe and unsafe
+	takesIntAndContext(1, ctx)
+	takesContextThenVariadic(ctx, "z")
 }

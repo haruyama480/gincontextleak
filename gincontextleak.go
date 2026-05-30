@@ -52,6 +52,9 @@ func run(pass *analysis.Pass) (any, error) {
 		if !ok {
 			return
 		}
+		if !signatureHasAnyContextParam(sig) {
+			return
+		}
 
 		for i, arg := range call.Args {
 			argTyp := pass.TypesInfo.TypeOf(arg)
@@ -167,4 +170,22 @@ func makeRequestContextEdit(pass *analysis.Pass, arg ast.Expr) analysis.TextEdit
 		End:     arg.End(),
 		NewText: buf.Bytes(),
 	}
+}
+
+// signatureHasAnyContextParam reports whether sig has at least one parameter
+// whose type is context.Context (including the element type of a variadic
+// ...context.Context parameter). It is used to skip call expressions early
+// when the callee cannot possibly accept a context.Context argument.
+func signatureHasAnyContextParam(sig *types.Signature) bool {
+	if sig == nil {
+		return false
+	}
+	params := sig.Params()
+	n := params.Len()
+	for i := 0; i < n; i++ {
+		if isContextType(paramTypeForArg(sig, i)) {
+			return true
+		}
+	}
+	return false
 }
