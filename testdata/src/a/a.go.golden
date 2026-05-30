@@ -1,0 +1,32 @@
+package a
+
+import (
+	"context"
+
+	"github.com/gin-gonic/gin"
+)
+
+func takesContext(ctx context.Context) {}
+
+func takesStringAndContext(name string, ctx context.Context) {}
+
+func takesTwoContexts(ctx1, ctx2 context.Context) {}
+
+func takesAny(v any) {}
+
+func takesVariadic(prefix string, ctxs ...context.Context) {}
+
+type runner struct{}
+
+func (runner) Run(ctx context.Context) {}
+
+func exercise(c *gin.Context, ctx context.Context, r runner) {
+	takesContext(c.Request.Context())                         // want `do not pass \*gin.Context where context.Context is expected`
+	takesStringAndContext("x", c.Request.Context())           // want `do not pass \*gin.Context where context.Context is expected`
+	takesTwoContexts(ctx, c.Request.Context())                // want `do not pass \*gin.Context where context.Context is expected`
+	takesVariadic("x", ctx, c.Request.Context())              // want `do not pass \*gin.Context where context.Context is expected`
+	r.Run(c.Request.Context())                                // want `do not pass \*gin.Context where context.Context is expected`
+
+	takesContext(ctx)
+	takesAny(c)
+}
