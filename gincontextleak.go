@@ -37,6 +37,12 @@ request and is safe to use.`,
 func run(pass *analysis.Pass) (any, error) {
 	ins := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
+	// Per-package caches for type predicate results.
+	// Within one analysis pass, the same semantic type reuses the same
+	// types.Type value, so map lookup by identity is both correct and fast.
+	ginCtxCache := make(map[types.Type]bool)
+	ctxCache := make(map[types.Type]bool)
+
 	nodeFilter := []ast.Node{
 		(*ast.CallExpr)(nil),
 	}
@@ -61,14 +67,14 @@ func run(pass *analysis.Pass) (any, error) {
 			if argTyp == nil {
 				continue
 			}
-			if !isGinContextPtr(argTyp) {
+			if !isGinContextPtrCached(argTyp, ginCtxCache) {
 				continue
 			}
 			paramTyp := paramTypeForArg(sig, i)
 			if paramTyp == nil {
 				continue
 			}
-			if !isContextType(paramTyp) {
+			if !isContextTypeCached(paramTyp, ctxCache) {
 				continue
 			}
 
@@ -91,11 +97,13 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func isGinContextPtr(t types.Type) bool {
+	t = unwrapAlias(t)
 	ptr, ok := t.(*types.Pointer)
 	if !ok {
 		return false
 	}
-	named, ok := ptr.Elem().(*types.Named)
+	elem := unwrapAlias(ptr.Elem())
+	named, ok := elem.(*types.Named)
 	if !ok {
 		return false
 	}
@@ -107,6 +115,7 @@ func isGinContextPtr(t types.Type) bool {
 }
 
 func isContextType(t types.Type) bool {
+	t = unwrapAlias(t)
 	named, ok := t.(*types.Named)
 	if !ok {
 		return false
@@ -116,6 +125,39 @@ func isContextType(t types.Type) bool {
 	}
 	pkg := named.Obj().Pkg()
 	return pkg != nil && pkg.Path() == "context"
+}
+
+// unwrapAlias repeatedly unwraps *types.Alias until a non-alias type is reached.
+// This makes the predicates robust against type aliases (type Foo = *gin.Context),
+// which became common after Go 1.23's improved alias support in go/types.
+func unwrapAlias(t types.Type) types.Type {
+	for {
+		alias, ok := t.(*types.Alias)
+		if !ok {
+			return t
+		}
+		t = alias.Underlying()
+	}
+}
+
+// Cached versions of the type predicates. The maps are local to a single
+// analysis.Pass (one package), so using the types.Type value as key is safe.
+func isGinContextPtrCached(t types.Type, cache map[types.Type]bool) bool {
+	if res, ok := cache[t]; ok {
+		return res
+	}
+	res := isGinContextPtr(t)
+	cache[t] = res
+	return res
+}
+
+func isContextTypeCached(t types.Type, cache map[types.Type]bool) bool {
+	if res, ok := cache[t]; ok {
+		return res
+	}
+	res := isContextType(t)
+	cache[t] = res
+	return res
 }
 
 func paramTypeForArg(sig *types.Signature, idx int) types.Type {
